@@ -2,6 +2,11 @@ const EXAMS = Array.isArray(window.EXAMS) ? window.EXAMS : [];
 
 const els = {
   home: document.getElementById("home"),
+  examMenu: document.getElementById("examMenu"),
+  examMenuTitle: document.getElementById("examMenuTitle"),
+  examMenuSubtitle: document.getElementById("examMenuSubtitle"),
+  testCards: document.getElementById("testCards"),
+  menuBackBtn: document.getElementById("menuBackBtn"),
   quiz: document.getElementById("quiz"),
   cards: document.getElementById("cards"),
   totalPill: document.getElementById("totalPill"),
@@ -16,20 +21,26 @@ const els = {
 };
 
 let currentExam = null;
+let currentTest = null;
+let currentQuestions = [];
 let answers = {};
 let submitted = false;
 
-function storageKey(examId) {
-  return `professional-exams:${examId}`;
+function quizId(exam, test = null) {
+  return test ? `${exam.id}:${test.id}` : exam.id;
 }
 
-function resultKey(examId) {
-  return `professional-exams:${examId}:best`;
+function storageKey(id) {
+  return `professional-exams:${id}`;
 }
 
-function loadAnswers(examId) {
+function resultKey(id) {
+  return `professional-exams:${id}:best`;
+}
+
+function loadAnswers(id) {
   try {
-    return JSON.parse(localStorage.getItem(storageKey(examId)) || "{}");
+    return JSON.parse(localStorage.getItem(storageKey(id)) || "{}");
   } catch {
     return {};
   }
@@ -37,11 +48,12 @@ function loadAnswers(examId) {
 
 function saveAnswers() {
   if (!currentExam) return;
-  localStorage.setItem(storageKey(currentExam.id), JSON.stringify(answers));
+  const id = quizId(currentExam, currentTest);
+  localStorage.setItem(storageKey(id), JSON.stringify(answers));
 }
 
-function getBestScore(examId) {
-  const raw = Number(localStorage.getItem(resultKey(examId)));
+function getBestScore(id) {
+  const raw = Number(localStorage.getItem(resultKey(id)));
   return Number.isFinite(raw) && raw >= 0 ? raw : null;
 }
 
@@ -52,16 +64,32 @@ function pluralTests(n) {
   return `${n} اختبار`;
 }
 
+function getExamQuestionCount(exam) {
+  if (Array.isArray(exam.tests) && exam.tests.length) {
+    return exam.tests.reduce((sum, test) => sum + (Array.isArray(test.questions) ? test.questions.length : 0), 0);
+  }
+  return Array.isArray(exam.questions) ? exam.questions.length : 0;
+}
+
+function getExamAnsweredCount(exam) {
+  if (Array.isArray(exam.tests) && exam.tests.length) {
+    return exam.tests.reduce((sum, test) => {
+      return sum + Object.keys(loadAnswers(quizId(exam, test))).length;
+    }, 0);
+  }
+  return Object.keys(loadAnswers(exam.id)).length;
+}
+
 function renderHome() {
   els.totalPill.textContent = pluralTests(EXAMS.length);
   els.cards.innerHTML = "";
 
   EXAMS.forEach((exam) => {
-    const count = Array.isArray(exam.questions) ? exam.questions.length : 0;
-    const saved = loadAnswers(exam.id);
-    const answered = Object.keys(saved).length;
+    const hasSubtests = Array.isArray(exam.tests) && exam.tests.length > 0;
+    const count = getExamQuestionCount(exam);
+    const answered = getExamAnsweredCount(exam);
     const pct = count ? Math.min(100, Math.round((answered / count) * 100)) : 0;
-    const best = getBestScore(exam.id);
+    const best = hasSubtests ? null : getBestScore(exam.id);
 
     const card = document.createElement("article");
     card.className = "card";
@@ -69,7 +97,8 @@ function renderHome() {
       <h2>${escapeHtml(exam.title)}</h2>
       <div class="subtitle muted">${escapeHtml(exam.subtitle || "")}</div>
       <div class="meta">
-        <span class="badge">${count} سؤال</span>
+        ${hasSubtests ? `<span class="badge">${pluralTests(exam.tests.length)}</span>` : `<span class="badge">${count} سؤال</span>`}
+        ${hasSubtests && count ? `<span class="badge">${count} سؤال</span>` : ""}
         ${exam.badge ? `<span class="badge">${escapeHtml(exam.badge)}</span>` : ""}
         ${best !== null ? `<span class="badge">أفضل نتيجة ${best}%</span>` : ""}
       </div>
@@ -77,14 +106,20 @@ function renderHome() {
         <span style="width:${pct}%"></span>
       </div>
       ${
-        count
-          ? `<button class="primary" type="button" data-exam="${escapeAttr(exam.id)}">
-              ${answered ? "متابعة الاختبار" : "بدء الاختبار"}
-            </button>`
-          : `<button class="disabled-btn" type="button" disabled>لم تتم إضافة الأسئلة بعد</button>`
+        hasSubtests
+          ? `<button class="primary" type="button" data-exam-menu="${escapeAttr(exam.id)}">فتح الاختبارات</button>`
+          : count
+            ? `<button class="primary" type="button" data-exam="${escapeAttr(exam.id)}">
+                ${answered ? "متابعة الاختبار" : "بدء الاختبار"}
+              </button>`
+            : `<button class="disabled-btn" type="button" disabled>لم تتم إضافة الأسئلة بعد</button>`
       }
     `;
     els.cards.appendChild(card);
+  });
+
+  els.cards.querySelectorAll("[data-exam-menu]").forEach((btn) => {
+    btn.addEventListener("click", () => openExamMenu(btn.dataset.examMenu));
   });
 
   els.cards.querySelectorAll("[data-exam]").forEach((btn) => {
@@ -92,17 +127,91 @@ function renderHome() {
   });
 }
 
-function startExam(id) {
-  currentExam = EXAMS.find((exam) => exam.id === id);
-  if (!currentExam || !currentExam.questions?.length) return;
+function openExamMenu(id) {
+  const exam = EXAMS.find((item) => item.id === id);
+  if (!exam || !Array.isArray(exam.tests) || !exam.tests.length) return;
 
+  currentExam = exam;
+  currentTest = null;
+  currentQuestions = [];
+  answers = {};
+  submitted = false;
+
+  els.home.classList.add("hidden");
+  els.quiz.classList.add("hidden");
+  els.examMenu.classList.remove("hidden");
+  els.examMenuTitle.textContent = exam.title;
+  els.examMenuSubtitle.textContent = "اختر الاختبار الذي تريد البدء به";
+
+  renderTestCards();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+function renderTestCards() {
+  els.testCards.innerHTML = "";
+  if (!currentExam?.tests) return;
+
+  currentExam.tests.forEach((test) => {
+    const count = Array.isArray(test.questions) ? test.questions.length : 0;
+    const id = quizId(currentExam, test);
+    const saved = loadAnswers(id);
+    const answered = Object.keys(saved).length;
+    const pct = count ? Math.min(100, Math.round((answered / count) * 100)) : 0;
+    const best = getBestScore(id);
+
+    const card = document.createElement("article");
+    card.className = "card";
+    card.innerHTML = `
+      <h2>${escapeHtml(test.title)}</h2>
+      <div class="subtitle muted">${escapeHtml(test.subtitle || "")}</div>
+      <div class="meta">
+        <span class="badge">${count} سؤال</span>
+        ${best !== null ? `<span class="badge">أفضل نتيجة ${best}%</span>` : ""}
+      </div>
+      <div class="progress" aria-label="نسبة التقدم">
+        <span style="width:${pct}%"></span>
+      </div>
+      ${
+        count
+          ? `<button class="primary" type="button" data-test="${escapeAttr(test.id)}">${answered ? "متابعة الاختبار" : "بدء الاختبار"}</button>`
+          : `<button class="disabled-btn" type="button" disabled>لم تتم إضافة الأسئلة بعد</button>`
+      }
+    `;
+    els.testCards.appendChild(card);
+  });
+
+  els.testCards.querySelectorAll("[data-test]").forEach((btn) => {
+    btn.addEventListener("click", () => startExam(currentExam.id, btn.dataset.test));
+  });
+}
+
+function startExam(examId, testId = null) {
+  const exam = EXAMS.find((item) => item.id === examId);
+  if (!exam) return;
+
+  const test = testId && Array.isArray(exam.tests)
+    ? exam.tests.find((item) => item.id === testId)
+    : null;
+
+  const questions = test
+    ? (Array.isArray(test.questions) ? test.questions : [])
+    : (Array.isArray(exam.questions) ? exam.questions : []);
+
+  if (!questions.length) return;
+
+  currentExam = exam;
+  currentTest = test;
+  currentQuestions = questions;
+  const id = quizId(exam, test);
   answers = loadAnswers(id);
   submitted = false;
+
   els.result.classList.add("hidden");
   els.result.innerHTML = "";
   els.home.classList.add("hidden");
+  els.examMenu.classList.add("hidden");
   els.quiz.classList.remove("hidden");
-  els.quizTitle.textContent = currentExam.title;
+  els.quizTitle.textContent = test ? `${exam.title} — ${test.title}` : exam.title;
 
   renderQuestions();
   updateStats();
@@ -112,7 +221,7 @@ function startExam(id) {
 function renderQuestions() {
   els.questions.innerHTML = "";
 
-  currentExam.questions.forEach((q, index) => {
+  currentQuestions.forEach((q, index) => {
     const card = document.createElement("article");
     card.className = "qcard";
     card.dataset.index = index;
@@ -157,8 +266,7 @@ function selectAnswer(index, key) {
 }
 
 function updateStats() {
-  if (!currentExam) return;
-  const total = currentExam.questions.length;
+  const total = currentQuestions.length;
   const answered = Object.keys(answers).length;
   const pct = total ? Math.round((answered / total) * 100) : 0;
   els.quizStats.textContent = `تمت الإجابة عن ${answered} من ${total}`;
@@ -166,16 +274,14 @@ function updateStats() {
 }
 
 function submitQuiz() {
-  if (!currentExam) return;
+  if (!currentExam || !currentQuestions.length) return;
 
-  const total = currentExam.questions.length;
-  if (!total) return;
-
+  const total = currentQuestions.length;
   let correct = 0;
   let wrong = 0;
   let unanswered = 0;
 
-  currentExam.questions.forEach((q, index) => {
+  currentQuestions.forEach((q, index) => {
     const chosen = answers[index];
     if (!chosen) unanswered++;
     else if (chosen === q.answer) correct++;
@@ -191,8 +297,9 @@ function submitQuiz() {
   });
 
   const pct = Math.round((correct / total) * 100);
-  const best = getBestScore(currentExam.id);
-  if (best === null || pct > best) localStorage.setItem(resultKey(currentExam.id), String(pct));
+  const id = quizId(currentExam, currentTest);
+  const best = getBestScore(id);
+  if (best === null || pct > best) localStorage.setItem(resultKey(id), String(pct));
 
   submitted = true;
   els.result.innerHTML = `
@@ -211,7 +318,8 @@ function submitQuiz() {
 
 function resetQuiz() {
   if (!currentExam) return;
-  localStorage.removeItem(storageKey(currentExam.id));
+  const id = quizId(currentExam, currentTest);
+  localStorage.removeItem(storageKey(id));
   answers = {};
   submitted = false;
   els.result.classList.add("hidden");
@@ -220,11 +328,28 @@ function resetQuiz() {
   updateStats();
 }
 
+function backFromQuiz() {
+  if (currentExam && currentTest && Array.isArray(currentExam.tests)) {
+    const examId = currentExam.id;
+    currentTest = null;
+    currentQuestions = [];
+    answers = {};
+    submitted = false;
+    els.quiz.classList.add("hidden");
+    openExamMenu(examId);
+    return;
+  }
+  goHome();
+}
+
 function goHome() {
   currentExam = null;
+  currentTest = null;
+  currentQuestions = [];
   answers = {};
   submitted = false;
   els.quiz.classList.add("hidden");
+  els.examMenu.classList.add("hidden");
   els.home.classList.remove("hidden");
   renderHome();
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -243,7 +368,8 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
-els.backBtn.addEventListener("click", goHome);
+els.menuBackBtn.addEventListener("click", goHome);
+els.backBtn.addEventListener("click", backFromQuiz);
 els.submitBtn.addEventListener("click", submitQuiz);
 els.resetBtn.addEventListener("click", resetQuiz);
 
