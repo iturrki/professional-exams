@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="منصة اختبارات مهنية قابلة للتوسّع">
+  <title>الاختبارات المهنية</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app">
+    <section id="home">
+      <div class="hero">
+        <div>
+          <span class="eyebrow">منصة تدريبية</span>
+          <h1>الاختبارات المهنية</h1>
+          <p>اختر الاختبار، أكمل الأسئلة، ثم راجع نتيجتك وإجاباتك.</p>
+        </div>
+        <span class="pill" id="totalPill">0 اختبار</span>
+      </div>
+
+      <div class="section-head">
+        <div>
+          <h2>الاختبارات المتاحة</h2>
+          <p>يمكن إضافة اختبارات جديدة من ملف <code>data.js</code> بدون تعديل الواجهة.</p>
+        </div>
+      </div>
+
+      <div id="cards" class="grid"></div>
+      <p class="note">
+        هذه منصة تدريبية وليست جهة اعتماد رسمية. أضف الأسئلة والمفاتيح من مصادر موثوقة قبل الاستخدام الفعلي.
+      </p>
+    </section>
+
+    <section id="quiz" class="hidden">
+      <div class="top">
+        <div class="topinner">
+          <button class="secondary" id="backBtn" type="button">رجوع</button>
+          <div class="topcopy">
+            <h2 id="quizTitle"></h2>
+            <div class="stats" id="quizStats"></div>
+          </div>
+        </div>
+        <div class="top-progress" aria-hidden="true">
+          <span id="topProgressBar"></span>
+        </div>
+      </div>
+
+      <div id="questions"></div>
+
+      <div class="actions">
+        <button class="primary" id="submitBtn" type="button">إنهاء وتصحيح الاختبار</button>
+        <button class="danger" id="resetBtn" type="button">مسح الإجابات</button>
+      </div>
+
+      <div id="result" class="result hidden"></div>
+    </section>
+  </div>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
