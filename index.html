@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f766e">
   <meta name="description" content="منصة اختبارات مهنية قابلة للتوسّع">
   <title>الاختبارات المهنية</title>
-  <link rel="stylesheet" href="./styles.css?v=20260820-2033">
+  <link rel="stylesheet" href="./styles.css?v=20260820-2057">
 </head>
 <body>
   <div class="app">
@@ -23,7 +23,7 @@
       <div class="section-head">
         <div>
           <h2>الاختبارات المتاحة</h2>
-          <p>يمكن إضافة اختبارات جديدة من ملف <code>data.js</code> بدون تعديل الواجهة.</p>
+          <p>اختر الاختبار المهني الذي تريد التدريب عليه.</p>
         </div>
       </div>
 
@@ -31,6 +31,27 @@
       <p class="note">
         هذه منصة تدريبية وليست جهة اعتماد رسمية. أضف الأسئلة والمفاتيح من مصادر موثوقة قبل الاستخدام الفعلي.
       </p>
+    </section>
+
+    <section id="examMenu" class="hidden">
+      <div class="top">
+        <div class="topinner">
+          <button class="secondary" id="menuBackBtn" type="button">رجوع</button>
+          <div class="topcopy">
+            <h2 id="examMenuTitle"></h2>
+            <div class="stats" id="examMenuSubtitle"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div>
+          <h2>الاختبارات</h2>
+          <p>اختر الاختبار الفرعي الذي تريد البدء به.</p>
+        </div>
+      </div>
+
+      <div id="testCards" class="grid"></div>
     </section>
 
     <section id="quiz" class="hidden">
@@ -58,7 +79,7 @@
     </section>
   </div>
 
-  <script src="./data.js?v=20260820-2033"></script>
-  <script src="./app.js?v=20260820-2033"></script>
+  <script src="./data.js?v=20260820-2057"></script>
+  <script src="./app.js?v=20260820-2057"></script>
 </body>
 </html>
